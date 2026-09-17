@@ -45,40 +45,9 @@ async function hashPassword(password) {
     .join("");
 }
 
-function normalizeDomain(input) {
-  const value = String(input || "").trim().toLowerCase();
-  if (!value) return null;
-
-  try {
-    const url = value.includes("://") ? new URL(value) : new URL(`https://${value}`);
-    const domain = url.hostname.replace(/^www\./, "");
-    return isValidDomain(domain) ? domain : null;
-  } catch {
-    const domain = value
-      .replace(/^https?:\/\//, "")
-      .replace(/^www\./, "")
-      .split(/[/?#]/)[0]
-      .trim();
-    return isValidDomain(domain) ? domain : null;
-  }
-}
-
-function normalizeKeyword(input) {
-  const keyword = String(input || "").trim().toLowerCase();
-  return /^[a-z0-9._-]+$/.test(keyword) ? keyword : null;
-}
-
-function isValidDomain(domain) {
-  return /^[a-z0-9.-]+$/.test(domain) &&
-    domain.includes(".") &&
-    !domain.startsWith(".") &&
-    !domain.endsWith(".") &&
-    !domain.includes("..");
-}
-
-function uniqueClean(lines, normalizer) {
-  return [...new Set(lines.map(normalizer).filter(Boolean))];
-}
+// normalizeDomain, normalizeKeyword, isValidDomain, and uniqueClean now
+// live in shared.js (loaded via <script> before this file) so the settings
+// page and the background service worker can never validate differently.
 
 function analyzeLines(text, normalizer) {
   const rawLines = text.split("\n").map(l => l.trim()).filter(l => l.length);
@@ -191,6 +160,15 @@ keywordInput.addEventListener("input", updateLiveCounts);
 
 // ---------- Security: password, rate limiting, inactivity auto-lock ----------
 
+async function updatePasswordButtonVisibility() {
+  const { password, passwordHash } = await chrome.storage.local.get(["password", "passwordHash"]);
+  const passwordAlreadySet = Boolean(password || passwordHash);
+  // Once a password exists, this control is gone for good. There is no
+  // in-app path left to change, disable, or clear an existing password —
+  // that's intentional, so a moment of weak willpower can't undo it.
+  setPasswordBtn.hidden = passwordAlreadySet;
+}
+
 function showLockoutMessage(until) {
   unlockBtn.disabled = true;
   if (lockoutInterval) clearInterval(lockoutInterval);
@@ -234,26 +212,14 @@ function resetInactivityTimer() {
   document.addEventListener(evt, () => { if (unlocked) resetInactivityTimer(); });
 });
 
-// unlockInFlight blocks re-entrant clicks synchronously (before any await),
-// so rapid/scripted repeated clicks can't race the failedAttempts
-// read-modify-write and dodge the lockout threshold.
-let unlockInFlight = false;
-
 unlockBtn.addEventListener("click", async () => {
-  if (unlockInFlight) return;
-  unlockInFlight = true;
-  unlockBtn.disabled = true;
-  let staysDisabled = false; // set when a lockout should keep the button disabled
+  const { lockoutUntil = 0 } = await chrome.storage.local.get(["lockoutUntil"]);
+  if (Date.now() < lockoutUntil) {
+    showLockoutMessage(lockoutUntil);
+    return;
+  }
 
-  try {
-    const { lockoutUntil = 0 } = await chrome.storage.local.get(["lockoutUntil"]);
-    if (Date.now() < lockoutUntil) {
-      showLockoutMessage(lockoutUntil);
-      staysDisabled = true;
-      return;
-    }
-
-    const data = await chrome.storage.local.get(["password", "passwordHash", "failedAttempts"]);
+  chrome.storage.local.get(["password", "passwordHash", "failedAttempts"], async data => {
     if (!data.password && !data.passwordHash) {
       lockStatus.textContent = "No password set. Click Set Password first.";
       lockStatus.className = "lock-status focusing";
@@ -282,20 +248,24 @@ unlockBtn.addEventListener("click", async () => {
         lockStatus.textContent = "Locked";
         lockStatus.className = "lock-status locked";
         showLockoutMessage(until);
-        staysDisabled = true;
       } else {
         await chrome.storage.local.set({ failedAttempts: attempts });
         lockStatus.textContent = `Wrong password (${attempts}/${MAX_ATTEMPTS})`;
         lockStatus.className = "lock-status locked";
       }
     }
-  } finally {
-    unlockInFlight = false;
-    if (!staysDisabled) unlockBtn.disabled = false;
-  }
+  });
 });
 
 setPasswordBtn.addEventListener("click", async () => {
+  // Defense in depth: even if this button were somehow still visible or got
+  // triggered some other way, never overwrite an existing password from here.
+  const existing = await chrome.storage.local.get(["password", "passwordHash"]);
+  if (existing.password || existing.passwordHash) {
+    await updatePasswordButtonVisibility();
+    return;
+  }
+
   const pw = passwordInput.value.trim();
   if (!pw) return;
   const passwordHash = await hashPassword(pw);
@@ -305,6 +275,7 @@ setPasswordBtn.addEventListener("click", async () => {
     unlocked = true;
     passwordInput.value = "";
     updateLockUI();
+    await updatePasswordButtonVisibility();
     lockStatus.textContent = "Password saved";
     lockStatus.className = "lock-status unlocked";
   });
@@ -527,4 +498,5 @@ setInterval(() => { if (unlocked) renderTimers(); }, 1000);
 
 checkExistingLockout();
 initDarkMode();
+updatePasswordButtonVisibility();
 updateLockUI();

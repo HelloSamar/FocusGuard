@@ -1,39 +1,9 @@
+// normalizeDomain, normalizeKeyword, isValidDomain, and uniqueClean live in
+// shared.js so this service worker and the settings page can never
+// validate domains/keywords differently from one another.
+importScripts("shared.js");
+
 const DASHBOARD_URL = chrome.runtime.getURL("dashboard.html");
-
-function normalizeDomain(input) {
-  const value = String(input || "").trim().toLowerCase();
-  if (!value) return null;
-
-  try {
-    const url = value.includes("://") ? new URL(value) : new URL(`https://${value}`);
-    const domain = url.hostname.replace(/^www\./, "");
-    return isValidDomain(domain) ? domain : null;
-  } catch {
-    const domain = value
-      .replace(/^https?:\/\//, "")
-      .replace(/^www\./, "")
-      .split(/[/?#]/)[0]
-      .trim();
-    return isValidDomain(domain) ? domain : null;
-  }
-}
-
-function normalizeKeyword(input) {
-  const keyword = String(input || "").trim().toLowerCase();
-  return /^[a-z0-9._-]+$/.test(keyword) ? keyword : null;
-}
-
-function isValidDomain(domain) {
-  return /^[a-z0-9.-]+$/.test(domain) &&
-    domain.includes(".") &&
-    !domain.startsWith(".") &&
-    !domain.endsWith(".") &&
-    !domain.includes("..");
-}
-
-function uniqueClean(items, normalizer) {
-  return [...new Set(items.map(normalizer).filter(Boolean))];
-}
 
 function buildRules(blocklist, keywords) {
   const domains = uniqueClean(blocklist, normalizeDomain);
@@ -46,21 +16,20 @@ function buildRules(blocklist, keywords) {
       type: "redirect",
       redirect: { url: `${DASHBOARD_URL}?blocked=${encodeURIComponent(domain)}&kind=domain` }
     },
-    condition: { urlFilter: `||${domain}^`, resourceTypes: ["main_frame"] }
+    condition: { urlFilter: `||${domain}^`, resourceTypes: ["main_frame", "sub_frame"] }
   }));
 
+  // Keyword IDs start well above the domain range (which only reaches 1000
+  // rules before this offset would have collided) so declarativeNetRequest
+  // never sees a duplicate ID even with a large imported blocklist.
   const keywordRules = words.map((word, i) => ({
-    id: 1000 + i + 1,
+    id: 100000 + i + 1,
     priority: 1,
     action: {
       type: "redirect",
       redirect: { url: `${DASHBOARD_URL}?blocked=${encodeURIComponent(word)}&kind=keyword` }
     },
-    // Anchored to require an http(s) scheme so this rule can never match its
-    // own redirect destination (chrome-extension://...), which would
-    // otherwise create a redirect loop since the destination URL embeds the
-    // keyword itself in its query string.
-    condition: { urlFilter: `|http*${word}`, resourceTypes: ["main_frame"] }
+    condition: { urlFilter: word, resourceTypes: ["main_frame", "sub_frame"] }
   }));
 
   return [...domainRules, ...keywordRules];

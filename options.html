@@ -475,11 +475,11 @@
       <div class="lock-row">
         <input class="mono-input" type="password" id="passwordInput" placeholder="enter password"/>
         <button class="btn btn-lime" id="unlockBtn" type="button">Unlock</button>
-        <button class="btn btn-ghost" id="setPasswordBtn" type="button">Set Password</button>
+        <button class="btn btn-ghost" id="setPasswordBtn" type="button" hidden>Set Password</button>
       </div>
       <div><span class="lock-status locked" id="lockStatus">Locked</span></div>
       <div id="lockoutMsg"></div>
-      <div class="hint">Auto-locks after 5 minutes idle. Note: uninstalling or disabling the extension in chrome://extensions also removes protection — that's a browser limitation, not a bypass we can close.</div>
+      <div class="hint">Auto-locks after 5 minutes idle. Once a password is set, it's permanent — this page has no way to change, disable, or clear it, so pick one you'll remember. Note: uninstalling or disabling the extension in chrome://extensions also removes protection — that's a browser limitation, not a bypass we can close.</div>
     </div>
 
     <div class="card">
@@ -598,6 +598,7 @@
       </div>
     </div>
   </div>
+  <script src="shared.js"></script>
   <script src="options.js"></script>
 </body>
 </html>
