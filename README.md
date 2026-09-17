@@ -18,7 +18,7 @@
 ## Features
 
 - **Block by domain or keyword** — one click to block the site you're on, or add keywords that match anywhere in a URL
-- **Password-protected settings** — SHA-256 hashed, 3-attempt lockout with a 30s cooldown, auto-locks after 5 minutes idle
+- **Password-protected settings** — SHA-256 hashed, 3-attempt lockout with a 30s cooldown, auto-locks after 5 minutes idle, and once set can't be changed, disabled, or cleared from the settings page
 - **Tab timers** — auto-close a tab after a set time, or just pause its video instead
 - **Progress dashboard** — total blocks, current & best streak, a 7-day chart, and your most-tempting sites
 - **Import/export** your blocklist and keywords as JSON
@@ -72,6 +72,7 @@ FocusGuard makes no network requests of its own and keeps all data in local brow
 focusguard/
 ├── manifest.json       # Manifest V3 config
 ├── background.js       # Service worker: blocklist rules, stats, tab timers
+├── shared.js           # Domain/keyword validation, shared by background.js and options.js
 ├── popup.html/.js      # Toolbar popup: block current site, tab timer
 ├── options.html/.js    # Settings: blocklist, keywords, password, stats, import/export
 ├── dashboard.html/.js  # Shown when a site/keyword is blocked

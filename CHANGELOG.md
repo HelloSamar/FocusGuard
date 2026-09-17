@@ -5,6 +5,28 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [2.0.0] - 2026-09-17
+
+### Security
+- Once a settings password is set, the "Set Password" control is now
+  permanently removed. There is no remaining in-app way to change,
+  disable, or clear an existing password — previously it could be
+  silently overwritten at any time, locked or unlocked, without knowing
+  the current one.
+
+### Fixed
+- `declarativeNetRequest` rule IDs no longer collide once more than 1,000
+  domains are blocked while a keyword rule also exists; keyword rule IDs
+  now start at a much higher offset.
+- Blocked domains embedded via `<iframe>` (`sub_frame` requests) are now
+  redirected too, not just direct top-level navigation to them.
+
+### Changed
+- Domain/keyword validation (`normalizeDomain`, `normalizeKeyword`,
+  `isValidDomain`, `uniqueClean`) is consolidated into a single shared.js
+  module used by both the settings page and the background service
+  worker, instead of being duplicated in each.
+
 ## [1.0.0] - 2026-08-22
 
 ### Added
